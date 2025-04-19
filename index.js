@@ -1,4 +1,3 @@
-// ローカルで .env を使う（GitHub Actions では無視される）
 if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config();
 }
@@ -30,7 +29,10 @@ const sheetName = 'ennoy';
   const items = [];
 
   const now = new Date();
-  const updateDate = now.toISOString().replace('T', ' ').slice(0, 19);
+  const updateDate = now.toLocaleString('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    hour12: false,
+  });
 
   let lineMessage = `ENNOY更新チェック：${updateDate}\n`;
 
@@ -85,5 +87,5 @@ const sheetName = 'ennoy';
     }
   );
 
-  console.log('✅ LINE通知送信完了');
+  console.log('LINE通知送信完了');
 })();
