@@ -1,5 +1,4 @@
 const { google } = require('googleapis');
-const fs = require('fs');
 const axios = require('axios');
 const cheerio = require('cheerio');
 
@@ -26,23 +25,20 @@ const sheetName = 'ennoy';
   const items = [];
 
   const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
-  const day = now.getDate();
-  const hour = now.getHours();
-  const minute = now.getMinutes();
-  const second = now.getSeconds();
+  const updateDate = now.toISOString().replace('T', ' ').slice(0, 19);
 
-  const updateDate = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+  let lineMessage = `ENNOY更新チェック：${updateDate}\n`;
 
   if ($('.items-grid_itemListLI_5c97110f').length === 0) {
     items.push(['商品なし', '', '', updateDate]);
+    lineMessage += '現在出品中の商品はありません。';
   } else {
     $('.items-grid_itemListLI_5c97110f').each((i, el) => {
       const title = $(el).find('.items-grid_itemTitleText_5c97110f').text().trim();
       const price = $(el).find('.items-grid_price_5c97110f').text().trim();
       const url = $(el).find('a').attr('href');
       items.push([title, price, `https://www.ennoy.pro${url}`, updateDate]);
+      lineMessage += `\n${title} - ${price}\nhttps://www.ennoy.pro${url}`;
     });
   }
 
@@ -57,4 +53,25 @@ const sheetName = 'ennoy';
   });
 
   console.log('✅ スプレッドシートに書き込み完了');
+
+  await axios.post(
+    'https://api.line.me/v2/bot/message/push',
+    {
+      to: process.env.LINE_USER_ID,
+      messages: [
+        {
+          type: 'text',
+          text: lineMessage,
+        },
+      ],
+    },
+    {
+      headers: {
+        'Authorization': `Bearer ${process.env.LINE_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  console.log('✅ LINE通知送信完了');
 })();
