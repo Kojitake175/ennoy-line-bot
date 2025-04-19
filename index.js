@@ -1,3 +1,8 @@
+// ローカルで .env を使う（GitHub Actions では無視される）
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
+
 const { google } = require('googleapis');
 const axios = require('axios');
 const cheerio = require('cheerio');
@@ -17,8 +22,8 @@ const sheetName = 'ennoy';
   const res = await axios.get('https://www.ennoy.pro/load_items/', {
     headers: {
       'User-Agent': 'Mozilla/5.0',
-      'Referer': 'https://www.ennoy.pro'
-    }
+      'Referer': 'https://www.ennoy.pro',
+    },
   });
 
   const $ = cheerio.load(res.data);
@@ -37,8 +42,8 @@ const sheetName = 'ennoy';
       const title = $(el).find('.items-grid_itemTitleText_5c97110f').text().trim();
       const price = $(el).find('.items-grid_price_5c97110f').text().trim();
       const url = $(el).find('a').attr('href');
-      items.push([title, price, `https://www.ennoy.pro${url}`, updateDate]);
-      lineMessage += `\n${title} - ${price}\nhttps://www.ennoy.pro${url}`;
+      items.push([title, price, url, updateDate]);
+      lineMessage += `\n${title} - ${price}\n${url}`;
     });
   }
 
@@ -54,10 +59,17 @@ const sheetName = 'ennoy';
 
   console.log('✅ スプレッドシートに書き込み完了');
 
+  const { LINE_USER_ID, LINE_ACCESS_TOKEN } = process.env;
+
+  if (!LINE_USER_ID || !LINE_ACCESS_TOKEN) {
+    console.error('❌ LINE_USER_ID または LINE_ACCESS_TOKEN が未設定です。');
+    return;
+  }
+
   await axios.post(
     'https://api.line.me/v2/bot/message/push',
     {
-      to: process.env.LINE_USER_ID,
+      to: LINE_USER_ID,
       messages: [
         {
           type: 'text',
@@ -67,7 +79,7 @@ const sheetName = 'ennoy';
     },
     {
       headers: {
-        'Authorization': `Bearer ${process.env.LINE_ACCESS_TOKEN}`,
+        Authorization: `Bearer ${LINE_ACCESS_TOKEN}`,
         'Content-Type': 'application/json',
       },
     }
