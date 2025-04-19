@@ -25,6 +25,6 @@ jobs:
         run: echo "${{ secrets.GCP_CREDENTIALS_JSON }}" > key.json
 
       - name: Run scraper
-        run: node scrape.js
+        run: node index.js
         env:
           GOOGLE_APPLICATION_CREDENTIALS: key.json
