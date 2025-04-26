@@ -14,6 +14,38 @@ const auth = new google.auth.GoogleAuth({
 const spreadsheetId = '14jilGL8Lgz0EeXP6q210frdbK-2ijoT4ZTFMFk-4k3Q';
 const sheetName = 'ennoy';
 
+// 稀に503エラーが出るので、リトライする
+async function safeAppend(sheets, items) {
+  const maxRetries = 5;
+  let attempt = 0;
+
+  while (attempt < maxRetries) {
+    try {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range: `${sheetName}!A1`,
+        valueInputOption: 'RAW',
+        insertDataOption: 'INSERT_ROWS',
+        requestBody: {
+          values: items,
+        },
+      });
+      console.log('✅ スプレッドシートに書き込み完了');
+      return;
+    } catch (error) {
+      if (error.code === 503) {
+        attempt++;
+        console.warn(`⚠️ 503エラー発生。リトライ (${attempt}/${maxRetries})...`);
+        await new Promise((resolve) => setTimeout(resolve, 3000)); // 3秒待機
+      } else {
+        console.error('❌ その他エラー:', error.message);
+        throw error;
+      }
+    }
+  }
+  throw new Error('❌ スプレッドシート書き込みリトライ上限に達しました');
+}
+
 (async () => {
   const client = await auth.getClient();
   const sheets = google.sheets({ version: 'v4', auth: client });
@@ -49,17 +81,7 @@ const sheetName = 'ennoy';
     });
   }
 
-  await sheets.spreadsheets.values.append({
-    spreadsheetId,
-    range: `${sheetName}!A1`,
-    valueInputOption: 'RAW',
-    insertDataOption: 'INSERT_ROWS',
-    requestBody: {
-      values: items,
-    },
-  });
-
-  console.log('✅ スプレッドシートに書き込み完了');
+  await safeAppend(sheets, items);
 
   const { LINE_USER_ID, LINE_ACCESS_TOKEN } = process.env;
 
@@ -87,5 +109,5 @@ const sheetName = 'ennoy';
     }
   );
 
-  console.log('LINE通知送信完了');
+  console.log('✅ LINE通知送信完了');
 })();
