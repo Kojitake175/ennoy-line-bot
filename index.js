@@ -14,41 +14,44 @@ const auth = new google.auth.GoogleAuth({
 const spreadsheetId = '14jilGL8Lgz0EeXP6q210frdbK-2ijoT4ZTFMFk-4k3Q';
 const sheetName = 'ennoy';
 
-// 稀に503エラーが出るので、リトライする
 async function safeAppend(sheets, items) {
   const maxRetries = 5;
-  let attempt = 0;
-
-  while (attempt < maxRetries) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       await sheets.spreadsheets.values.append({
         spreadsheetId,
         range: `${sheetName}!A1`,
         valueInputOption: 'RAW',
         insertDataOption: 'INSERT_ROWS',
-        requestBody: {
-          values: items,
-        },
+        requestBody: { values: items },
       });
-      console.log('✅ スプレッドシートに書き込み完了');
+      console.log('スプレッドシートに書き込み完了');
       return;
     } catch (error) {
       if (error.code === 503) {
-        attempt++;
         console.warn(`⚠️ 503エラー発生。リトライ (${attempt}/${maxRetries})...`);
-        await new Promise((resolve) => setTimeout(resolve, 3000)); // 3秒待機
+        await new Promise((r) => setTimeout(r, 3000));
       } else {
-        console.error('❌ その他エラー:', error.message);
+        console.error('その他エラー:', error.message);
         throw error;
       }
     }
   }
-  throw new Error('❌ スプレッドシート書き込みリトライ上限に達しました');
+  throw new Error('スプレッドシート書き込みリトライ上限に達しました');
 }
 
 (async () => {
   const client = await auth.getClient();
   const sheets = google.sheets({ version: 'v4', auth: client });
+
+  const readRes = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${sheetName}!C2:D`,
+  });
+
+  const existingEntries = new Set(
+    (readRes.data.values || []).map(([url, stock]) => `${url}|${stock}`)
+  );
 
   const res = await axios.get('https://www.ennoy.pro/load_items/', {
     headers: {
@@ -58,56 +61,66 @@ async function safeAppend(sheets, items) {
   });
 
   const $ = cheerio.load(res.data);
-  const items = [];
-
   const now = new Date();
   const updateDate = now.toLocaleString('ja-JP', {
     timeZone: 'Asia/Tokyo',
     hour12: false,
   });
 
+  const allItems = [];
+  const notifyItems = [];
   let lineMessage = `ENNOY更新チェック：${updateDate}\n`;
 
-  if ($('.items-grid_itemListLI_5c97110f').length === 0) {
-    items.push(['商品なし', '', '', updateDate]);
-    lineMessage += '現在出品中の商品はありません。';
-  } else {
-    $('.items-grid_itemListLI_5c97110f').each((i, el) => {
-      const title = $(el).find('.items-grid_itemTitleText_5c97110f').text().trim();
-      const price = $(el).find('.items-grid_price_5c97110f').text().trim();
-      const url = $(el).find('a').attr('href');
-      items.push([title, price, url, updateDate]);
-      lineMessage += `\n${title} - ${price}\n${url}`;
-    });
-  }
+  $('a.js-anchor').each((i, el) => {
+    const title = $(el).find('p[class*="itemTitleText"]').text().trim();
+    const price = $(el).find('p[class*="price"]').text().trim();
+    const relativeUrl = $(el).attr('href');
+    const fullUrl = `https://www.ennoy.pro${relativeUrl}`;
+    const stockStatus = $(el).find('p[class*="soldOut"]').text().trim() || 'IN STOCK';
 
-  await safeAppend(sheets, items);
+    const uniqueKey = `${fullUrl}|${stockStatus}`;
 
-  const { LINE_USER_ID, LINE_ACCESS_TOKEN } = process.env;
+    const row = [title, price, fullUrl, stockStatus, updateDate];
+    allItems.push(row);
 
-  if (!LINE_USER_ID || !LINE_ACCESS_TOKEN) {
-    console.error('❌ LINE_USER_ID または LINE_ACCESS_TOKEN が未設定です。');
-    return;
-  }
-
-  await axios.post(
-    'https://api.line.me/v2/bot/message/push',
-    {
-      to: LINE_USER_ID,
-      messages: [
-        {
-          type: 'text',
-          text: lineMessage,
-        },
-      ],
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${LINE_ACCESS_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
+    if (!existingEntries.has(uniqueKey)) {
+      notifyItems.push(row);
+      lineMessage += `\n${title} - ${price} - ${stockStatus}\n${fullUrl}`;
     }
-  );
+  });
 
-  console.log('✅ LINE通知送信完了');
+  // スプレッドシート常に更新する
+  await safeAppend(sheets, allItems);
+
+  // 新着商品や在庫変化がある場合のみLINE通知する
+  if (notifyItems.length > 0) {
+    const { LINE_USER_ID, LINE_ACCESS_TOKEN } = process.env;
+    if (!LINE_USER_ID || !LINE_ACCESS_TOKEN) {
+      console.error('LINE_USER_ID または LINE_ACCESS_TOKEN が未設定です。');
+      return;
+    }
+
+    await axios.post(
+      'https://api.line.me/v2/bot/message/push',
+      {
+        to: LINE_USER_ID,
+        messages: [
+          {
+            type: 'text',
+            text: lineMessage,
+          },
+        ],
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${LINE_ACCESS_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    console.log('LINE通知送信完了');
+  } else {
+    console.log('新着・在庫復活はありません。');
+  }
 })();
