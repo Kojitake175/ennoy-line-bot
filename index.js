@@ -7,7 +7,7 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 
 const auth = new google.auth.GoogleAuth({
-  keyFile: './voltaic-mode-428705-s2-f2f0dcddfa23.json',
+  keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
   scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
 
