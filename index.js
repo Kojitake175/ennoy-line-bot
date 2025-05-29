@@ -14,6 +14,11 @@ const auth = new google.auth.GoogleAuth({
 const spreadsheetId = '14jilGL8Lgz0EeXP6q210frdbK-2ijoT4ZTFMFk-4k3Q';
 const sheetName = 'ennoy';
 
+// 相対パスか絶対パスかに応じて正しいURLを返す
+function buildUrl(href) {
+  return href.startsWith('http') ? href : `https://www.ennoy.pro${href}`;
+}
+
 async function safeAppend(sheets, items) {
   const maxRetries = 5;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -29,7 +34,7 @@ async function safeAppend(sheets, items) {
       return;
     } catch (error) {
       if (error.code === 503) {
-        console.warn(`⚠️ 503エラー発生。リトライ (${attempt}/${maxRetries})...`);
+        console.warn(`503エラー発生。リトライ (${attempt}/${maxRetries})...`);
         await new Promise((r) => setTimeout(r, 3000));
       } else {
         console.error('その他エラー:', error.message);
@@ -74,12 +79,11 @@ async function safeAppend(sheets, items) {
   $('a.js-anchor').each((i, el) => {
     const title = $(el).find('p[class*="itemTitleText"]').text().trim();
     const price = $(el).find('p[class*="price"]').text().trim();
-    const relativeUrl = $(el).attr('href');
-    const fullUrl = `https://www.ennoy.pro${relativeUrl}`;
+    const rawHref = $(el).attr('href');
+    const fullUrl = buildUrl(rawHref);
     const stockStatus = $(el).find('p[class*="soldOut"]').text().trim() || 'IN STOCK';
 
     const uniqueKey = `${fullUrl}|${stockStatus}`;
-
     const row = [title, price, fullUrl, stockStatus, updateDate];
     allItems.push(row);
 
