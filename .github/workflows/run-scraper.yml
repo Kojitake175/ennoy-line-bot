@@ -11,7 +11,7 @@ jobs:
     env:
       LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
       LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
-      GCP_CREDENTIALS_JSON: ${{ secrets.GCP_CREDENTIALS_JSON }}
+      GCP_CREDENTIALS_B64: ${{ secrets.GCP_CREDENTIALS_B64 }}
 
     steps:
       - name: Checkout repository
@@ -27,10 +27,10 @@ jobs:
 
       - name: Restore service account credentials
         run: |
-          printf '%s' "$GCP_CREDENTIALS_JSON" > voltaic-mode-428705-s2-f2f0dcddfa23.json
+          echo "$GCP_CREDENTIALS_B64" | base64 -d > voltaic-mode-428705-s2-f2f0dcddfa23.json
         shell: bash
         env:
-          GCP_CREDENTIALS_JSON: ${{ secrets.GCP_CREDENTIALS_JSON }}
+          GCP_CREDENTIALS_B64: ${{ secrets.GCP_CREDENTIALS_B64 }}
 
       - name: Run scraper
         run: node index.js
