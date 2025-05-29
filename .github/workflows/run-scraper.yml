@@ -24,10 +24,8 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Create credentials file
-        run: echo "${{ secrets.GCP_CREDENTIALS_JSON }}" > key.json
+      - name: Restore service account credentials
+        run: echo "${{ secrets.GCP_CREDENTIALS_JSON }}" > voltaic-mode-428705-s2-f2f0dcddfa23.json
 
       - name: Run scraper
         run: node index.js
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: key.json
