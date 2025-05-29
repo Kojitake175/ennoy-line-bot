@@ -26,7 +26,11 @@ jobs:
         run: npm install
 
       - name: Restore service account credentials
-        run: echo "${{ secrets.GCP_CREDENTIALS_JSON }}" > voltaic-mode-428705-s2-f2f0dcddfa23.json
+        run: |
+          printf '%s' "$GCP_CREDENTIALS_JSON" > voltaic-mode-428705-s2-f2f0dcddfa23.json
+        shell: bash
+        env:
+          GCP_CREDENTIALS_JSON: ${{ secrets.GCP_CREDENTIALS_JSON }}
 
       - name: Run scraper
         run: node index.js
