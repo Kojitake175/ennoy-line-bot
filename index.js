@@ -125,6 +125,6 @@ async function safeAppend(sheets, items) {
 
     console.log('LINE通知送信完了');
   } else {
-    console.log('新着・在庫復活はありません。');
+    console.log('新着・在庫追加はありません。');
   }
 })();
